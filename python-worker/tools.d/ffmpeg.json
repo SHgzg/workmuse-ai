@@ -1,0 +1,7 @@
+{
+  "id": "ffmpeg",
+  "executables": ["ffmpeg"],
+  "versionArgs": ["-version"],
+  "capabilities": ["media.normalize", "media.extract-audio", "video.keyframes"],
+  "managed": true
+}

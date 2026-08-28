@@ -1,0 +1,6 @@
+{
+  "id": "docling",
+  "executables": ["docling"],
+  "capabilities": ["document.extract", "document.layout", "image.ocr"],
+  "managed": true
+}

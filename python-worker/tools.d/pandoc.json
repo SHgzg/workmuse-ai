@@ -1,0 +1,6 @@
+{
+  "id": "pandoc",
+  "executables": ["pandoc"],
+  "capabilities": ["document.convert"],
+  "managed": true
+}

@@ -1,0 +1,7 @@
+{
+  "id": "ffprobe",
+  "executables": ["ffprobe"],
+  "versionArgs": ["-version"],
+  "capabilities": ["media.inspect"],
+  "managed": true
+}

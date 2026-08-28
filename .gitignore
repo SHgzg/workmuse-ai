@@ -2,5 +2,11 @@ node_modules/
 .pnpm-store/
 out/
 release/
+build/*
+!build/runtime/
+build/runtime/*
+!build/runtime/.gitkeep
 *.log
+__pycache__/
+*.py[cod]
 .DS_Store

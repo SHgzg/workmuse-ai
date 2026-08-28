@@ -1,0 +1,6 @@
+{
+  "id": "mineru",
+  "executables": ["mineru", "magic-pdf"],
+  "capabilities": ["document.extract-fallback", "document.formula", "document.table"],
+  "managed": true
+}

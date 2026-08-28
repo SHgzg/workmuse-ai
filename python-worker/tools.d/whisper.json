@@ -1,0 +1,6 @@
+{
+  "id": "whisper",
+  "executables": ["whisper"],
+  "capabilities": ["audio.transcribe"],
+  "managed": true
+}

@@ -1,0 +1,6 @@
+{
+  "id": "tesseract",
+  "executables": ["tesseract"],
+  "capabilities": ["image.ocr-fallback"],
+  "managed": true
+}
