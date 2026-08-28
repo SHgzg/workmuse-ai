@@ -220,7 +220,9 @@ def _looks_like_heading(first_line: str, value: str) -> bool:
 
 def _is_relative_to(path: Path, root: Path) -> bool:
     try:
-        path.relative_to(root)
+        # Resolve both sides: macOS aliases /var to /private/var and Windows may
+        # normalize temporary directory casing or short names.
+        path.relative_to(root.resolve(strict=True))
         return True
-    except ValueError:
+    except (OSError, ValueError):
         return False

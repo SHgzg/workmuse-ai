@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 from workmuse_worker.adapters import _transcript_blocks, _understand_with_python_libraries, frame_interval_seconds
-from workmuse_worker.content import inspect_resource
+from workmuse_worker.content import _is_relative_to, inspect_resource
 
 
 class BuiltinAdapterTests(unittest.IsolatedAsyncioTestCase):
@@ -14,6 +14,14 @@ class BuiltinAdapterTests(unittest.IsolatedAsyncioTestCase):
 
     async def progress(self, event: str, data: dict) -> None:
         self.events.append((event, data))
+
+    async def test_allowed_root_is_normalized_before_containment_check(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            nested = root / "nested"
+            nested.mkdir()
+            equivalent_root = nested / ".."
+            self.assertTrue(_is_relative_to((root / "resource.txt").resolve(), equivalent_root))
 
     async def test_pdf_pages_are_extracted_with_page_evidence(self) -> None:
         from reportlab.pdfgen.canvas import Canvas
