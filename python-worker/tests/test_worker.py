@@ -9,13 +9,20 @@ from unittest.mock import patch
 
 from workmuse_worker.server import WorkerServer
 from workmuse_worker.tools import probe_tool, sanitized_environment
-from workmuse_worker.understanding import understand_resource
+from workmuse_worker.understanding import _validate_output_directory, understand_resource
 from workmuse_worker.content import chunk_content
 from workmuse_worker.ai import answer_question, apply_visual_analysis, normalize_semantics
 from workmuse_worker.quality import assess_content
 
 
 class WorkerTests(unittest.IsolatedAsyncioTestCase):
+    async def test_output_root_is_normalized_before_containment_check(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            nested = root / "nested"
+            nested.mkdir()
+            _validate_output_directory(root / "artifacts", (nested / "..",))
+
     async def test_registered_missing_tool_is_reported(self) -> None:
         result = await probe_tool("docling")
         self.assertEqual(result["id"], "docling")

@@ -5,7 +5,7 @@ from typing import Any, Awaitable, Callable
 
 from .adapters import understand_document, understand_media
 from .ai import enrich_content, enrich_image_content
-from .content import chunk_content, inspect_resource, persist_content, understand_text
+from .content import _is_relative_to, chunk_content, inspect_resource, persist_content, understand_text
 from .quality import assess_content
 
 Progress = Callable[[str, dict[str, Any]], Awaitable[None]]
@@ -55,11 +55,3 @@ def _validate_output_directory(path: Path, allowed_roots: tuple[Path, ...]) -> N
     resolved = path.resolve()
     if allowed_roots and not any(_is_relative_to(resolved, root) for root in allowed_roots):
         raise PermissionError("Output directory is outside the configured roots")
-
-
-def _is_relative_to(path: Path, root: Path) -> bool:
-    try:
-        path.relative_to(root)
-        return True
-    except ValueError:
-        return False
