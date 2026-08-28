@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self' ws: http://localhost:*" />
+    <title>WorkMuse</title>
+  </head>
+  <body>
+    <main class="card">
+      <div class="mark">↻</div>
+      <p class="eyebrow">YOUR PERSONAL AI WORK ASSISTANT</p>
+      <h1>WorkMuse</h1>
+      <p class="version">当前版本 <span id="version">…</span></p>
+      <section class="status" aria-live="polite">
+        <strong id="status">正在初始化…</strong>
+        <progress id="progress" max="100" value="0" hidden></progress>
+      </section>
+      <div class="actions">
+        <button id="check" type="button">检查更新</button>
+        <button id="install" class="primary" type="button" hidden>重启并安装</button>
+      </div>
+      <p class="hint">正式安装包启动后会自动检查；下载完成后也可退出应用自动安装。</p>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
