@@ -1,6 +1,6 @@
 {
   "name": "workmuse-ai",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "A personal AI work assistant for focused, organized daily work",
   "main": "out/main/index.js",
   "author": "SHgzg",
