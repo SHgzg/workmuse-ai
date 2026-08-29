@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { createReadStream } from 'node:fs'
-import { copyFile, mkdir, stat } from 'node:fs/promises'
+import { copyFile, mkdir, readdir, stat } from 'node:fs/promises'
 import { basename, extname, join } from 'node:path'
 
 export type ImportedAsset = {
@@ -13,7 +13,11 @@ export type ImportedAsset = {
 }
 
 export class AssetStore {
-  constructor(private readonly dataDirectory: string) {}
+  private readonly dataDirectory: string
+
+  constructor(dataDirectory: string) {
+    this.dataDirectory = dataDirectory
+  }
 
   async importFile(sourcePath: string): Promise<ImportedAsset> {
     const sourceStat = await stat(sourcePath)
@@ -41,6 +45,19 @@ export class AssetStore {
       artifactDirectory,
       size: sourceStat.size
     }
+  }
+
+  async resolveFile(resourceId: string): Promise<string> {
+    const match = /^sha256:([a-f0-9]{64})$/.exec(resourceId)
+    if (!match) throw new Error('Invalid resource id.')
+    const assetDirectory = join(this.dataDirectory, 'assets', match[1])
+    const entries = await readdir(assetDirectory)
+    const original = entries.find((entry) => /^original(?:\.[a-zA-Z0-9]{1,10})?$/.test(entry))
+    if (!original) throw new Error('Original resource is unavailable.')
+    const path = join(assetDirectory, original)
+    const fileStat = await stat(path)
+    if (!fileStat.isFile()) throw new Error('Original resource is not a file.')
+    return path
   }
 }
 

@@ -73,9 +73,28 @@ the worker and are never supplied by the renderer. Arguments are passed as an
 array without a command shell. Each production pipeline should additionally
 restrict allowed arguments and working directories in its adapter.
 
-## Next integration step
+## Renderer integration
 
-The Electron main process creates one `PythonWorkerClient`, imports selected
-files into a checksum-addressed asset store, and exposes only status and resource
-import through preload. It stops the worker during `before-quit`. Arbitrary
-`tools.run` access remains an internal Core API and is not exposed through IPC.
+The Electron main process creates one `PythonWorkerClient` and exposes a narrow,
+typed preload API for Core status, user-initiated resource import, persistent job
+status, local search, bounded search context, grounded answers and Core settings.
+The file cabinet uses these APIs to show loading, empty, failure and offline
+states. Global search returns normalized source locations and evidence IDs.
+
+Opening a search source never accepts a renderer-supplied path. The renderer
+passes a `sha256:` resource ID, and the main process resolves it inside the
+checksum-addressed asset store before asking the operating system to open it.
+Malformed IDs and missing originals fail without opening a path.
+
+When a grounded AI answer is converted into a task, the business store keeps
+the AI suggestion and its source resource/block references as separate source
+records. The suggestion must not be presented as an original fact.
+
+The worker is stopped during `before-quit`. Arbitrary `tools.run` access remains
+an internal Core API and is not exposed through IPC. Permission filtering is a
+required gate before team or shared resources are added to renderer search.
+
+Desktop startup uses software rendering for compatibility with remote desktops
+and Windows images without a working Chromium GPU runtime. Top-level startup
+failures are surfaced to the user and terminate cleanly instead of leaving an
+uninitialized window running.

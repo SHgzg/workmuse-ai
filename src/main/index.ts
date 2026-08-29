@@ -1,9 +1,10 @@
-import { app, BrowserWindow, dialog, ipcMain } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { join } from 'node:path'
 import electronUpdater, { type AppUpdater, type ProgressInfo, type UpdateInfo } from 'electron-updater'
-import { AssetStore, PythonWorkerClient, ResourceCore, resolveWorkerRuntime } from '../core'
+import { AssetStore, PythonWorkerClient, ResourceCore, WorkspaceStore, resolveWorkerRuntime } from '../core'
 import { DataProtectionService } from './data-protection'
 import { CoreConfigStore, type PublicCoreSettings } from './core-config'
+import { LocalAuthStore } from './local-auth'
 
 type UpdateState = {
   status: 'idle' | 'checking' | 'available' | 'not-available' | 'downloading' | 'protecting' | 'downloaded' | 'error' | 'disabled'
@@ -20,6 +21,31 @@ let coreStartupError: string | null = null
 let dataProtection: DataProtectionService | null = null
 let downloadedVersion: string | null = null
 let coreConfig: CoreConfigStore | null = null
+let workspaceStore: WorkspaceStore | null = null
+let authStore: LocalAuthStore | null = null
+
+// WorkMuse is a document-centric desktop app. Software rendering avoids known
+// GPU-process crashes on remote desktops and Windows environments without a
+// compatible graphics runtime.
+app.disableHardwareAcceleration()
+
+function requireAuthenticated(): void {
+  if (!authStore) throw new Error('Authentication is unavailable.')
+  authStore.requireAuthenticated()
+}
+
+async function validateResourceReferences(input: unknown): Promise<void> {
+  if (!input || typeof input !== 'object') return
+  const sources = (input as { sources?: unknown }).sources
+  if (sources === undefined) return
+  if (!Array.isArray(sources)) throw new Error('Sources are invalid.')
+  for (const source of sources) {
+    if (!source || typeof source !== 'object' || (source as { kind?: unknown }).kind !== 'resource') continue
+    const resourceId = (source as { id?: unknown }).id
+    if (!assetStore || typeof resourceId !== 'string') throw new Error('Resource source is invalid.')
+    await assetStore.resolveFile(resourceId)
+  }
+}
 
 async function initializeCore(): Promise<void> {
   const dataDirectory = join(app.getPath('userData'), 'core')
@@ -59,6 +85,7 @@ async function initializeCore(): Promise<void> {
 
 function registerCoreIpc(): void {
   ipcMain.handle('core:status', async () => {
+    requireAuthenticated()
     const [tools, runtime] = resourceCore
       ? await Promise.all([resourceCore.listCapabilities(), resourceCore.inspectRuntime()])
       : [[], null]
@@ -69,6 +96,7 @@ function registerCoreIpc(): void {
     }
   })
   ipcMain.handle('core:import', async () => {
+    requireAuthenticated()
     if (!mainWindow || !assetStore) throw new Error('Core is not initialized.')
     const selection = await dialog.showOpenDialog(mainWindow, {
       properties: ['openFile'],
@@ -87,40 +115,140 @@ function registerCoreIpc(): void {
     return { asset, processing, error: null }
   })
   ipcMain.handle('core:jobs', async () => {
+    requireAuthenticated()
     if (!workerClient) return []
     return workerClient.request('jobs.list', { limit: 100 }, 10_000)
   })
   ipcMain.handle('core:job-cancel', async (_event, jobId: unknown) => {
+    requireAuthenticated()
     if (!workerClient || typeof jobId !== 'string') return false
     return workerClient.cancel(jobId)
   })
   ipcMain.handle('core:job-retry', async (_event, jobId: unknown) => {
+    requireAuthenticated()
     if (!workerClient || typeof jobId !== 'string') throw new Error('Invalid job id.')
     return workerClient.request('jobs.retry', { jobId }, 10_000)
   })
   ipcMain.handle('core:search', async (_event, query: unknown, limit: unknown) => {
-    if (!resourceCore || typeof query !== 'string') return []
+    requireAuthenticated()
+    if (!resourceCore) throw new Error('Core is unavailable.')
+    if (typeof query !== 'string' || !query.trim()) throw new Error('Search query is required.')
     return resourceCore.search(
-      query,
-      typeof limit === 'number' ? limit : 20,
+      query.trim(),
+      typeof limit === 'number' ? Math.max(1, Math.min(100, Math.floor(limit))) : 20,
       undefined,
       coreConfig?.publicSettings().allowCloud ?? false
     )
   })
+  ipcMain.handle('core:open-source', async (_event, resourceId: unknown) => {
+    requireAuthenticated()
+    if (!assetStore || typeof resourceId !== 'string') throw new Error('Invalid resource id.')
+    const path = await assetStore.resolveFile(resourceId)
+    const error = await shell.openPath(path)
+    if (error) throw new Error(error)
+    return true
+  })
   ipcMain.handle('core:context', async (_event, query: unknown) => {
+    requireAuthenticated()
     if (!resourceCore || typeof query !== 'string') throw new Error('Core is unavailable.')
     return resourceCore.buildContext(query, 12_000, undefined, coreConfig?.publicSettings().allowCloud ?? false)
   })
   ipcMain.handle('core:answer', async (_event, question: unknown) => {
+    requireAuthenticated()
     if (!resourceCore || typeof question !== 'string') throw new Error('Core is unavailable.')
     return resourceCore.answer(question, { allowCloud: coreConfig?.publicSettings().allowCloud ?? false })
   })
-  ipcMain.handle('core:settings-get', () => coreConfig?.publicSettings() ?? null)
+  ipcMain.handle('core:settings-get', () => { requireAuthenticated(); return coreConfig?.publicSettings() ?? null })
   ipcMain.handle('core:settings-set', async (_event, settings: unknown): Promise<PublicCoreSettings> => {
+    requireAuthenticated()
     if (!coreConfig) throw new Error('Core settings are unavailable.')
     const updated = await coreConfig.update(settings)
     await initializeCore()
     return updated
+  })
+  ipcMain.handle('workspace:list', () => {
+    requireAuthenticated()
+    if (!workspaceStore) throw new Error('Workspace data is unavailable.')
+    return workspaceStore.list()
+  })
+  ipcMain.handle('workspace:goal-create', async (_event, input: unknown) => {
+    requireAuthenticated()
+    if (!workspaceStore) throw new Error('Workspace data is unavailable.')
+    await validateResourceReferences(input)
+    return workspaceStore.createGoal(input)
+  })
+  ipcMain.handle('workspace:task-create', async (_event, input: unknown) => {
+    requireAuthenticated()
+    if (!workspaceStore) throw new Error('Workspace data is unavailable.')
+    await validateResourceReferences(input)
+    return workspaceStore.createTask(input)
+  })
+  ipcMain.handle('workspace:outcome-create', async (_event, input: unknown) => {
+    requireAuthenticated()
+    if (!workspaceStore) throw new Error('Workspace data is unavailable.')
+    await validateResourceReferences(input)
+    return workspaceStore.createOutcome(input)
+  })
+  ipcMain.handle('workspace:task-status', (_event, id: unknown, status: unknown) => {
+    requireAuthenticated()
+    if (!workspaceStore) throw new Error('Workspace data is unavailable.')
+    return workspaceStore.updateTaskStatus(id, status)
+  })
+  ipcMain.handle('workspace:outcome-status', (_event, id: unknown, status: unknown) => {
+    requireAuthenticated()
+    if (!workspaceStore) throw new Error('Workspace data is unavailable.')
+    return workspaceStore.updateOutcomeStatus(id, status)
+  })
+  ipcMain.handle('workspace:goal-progress', (_event, id: unknown, input: unknown) => {
+    requireAuthenticated()
+    if (!workspaceStore) throw new Error('Workspace data is unavailable.')
+    return workspaceStore.updateGoalProgress(id, input)
+  })
+  ipcMain.handle('workspace:meeting-status', (_event, id: unknown, status: unknown) => {
+    requireAuthenticated()
+    if (!workspaceStore) throw new Error('Workspace data is unavailable.')
+    return workspaceStore.updateMeetingStatus(id, status)
+  })
+  ipcMain.handle('workspace:meeting-attach-resource', async (_event, id: unknown, resourceId: unknown) => {
+    requireAuthenticated()
+    if (!workspaceStore || !assetStore || typeof resourceId !== 'string') throw new Error('Meeting data is unavailable.')
+    await assetStore.resolveFile(resourceId)
+    return workspaceStore.attachMeetingResource(id, resourceId)
+  })
+  ipcMain.handle('workspace:inspiration-create', async (_event, input: unknown) => {
+    requireAuthenticated()
+    if (!workspaceStore) throw new Error('Workspace data is unavailable.')
+    await validateResourceReferences(input)
+    return workspaceStore.createInspiration(input)
+  })
+  ipcMain.handle('workspace:inspiration-convert', (_event, id: unknown, input: unknown) => {
+    requireAuthenticated()
+    if (!workspaceStore) throw new Error('Workspace data is unavailable.')
+    return workspaceStore.convertInspirationToTask(id, input)
+  })
+  ipcMain.handle('workspace:project-create', async (_event, input: unknown) => {
+    requireAuthenticated()
+    if (!workspaceStore) throw new Error('Workspace data is unavailable.')
+    await validateResourceReferences(input)
+    return workspaceStore.createProject(input)
+  })
+  ipcMain.handle('workspace:meeting-create', async (_event, input: unknown) => {
+    requireAuthenticated()
+    if (!workspaceStore || !assetStore) throw new Error('Workspace data is unavailable.')
+    await validateResourceReferences(input)
+    if (input && typeof input === 'object' && Array.isArray((input as { resourceIds?: unknown }).resourceIds)) {
+      await Promise.all((input as { resourceIds: unknown[] }).resourceIds.map((id) => {
+        if (typeof id !== 'string') throw new Error('Resource ID is invalid.')
+        return assetStore!.resolveFile(id)
+      }))
+    }
+    return workspaceStore.createMeeting(input)
+  })
+  ipcMain.handle('workspace:knowledge-confirm', async (_event, input: unknown) => {
+    requireAuthenticated()
+    if (!workspaceStore) throw new Error('Workspace data is unavailable.')
+    await validateResourceReferences(input)
+    return workspaceStore.confirmKnowledge(input)
   })
 }
 
@@ -199,6 +327,16 @@ function createWindow(): void {
 app.whenReady().then(async () => {
   dataProtection = new DataProtectionService(app.getPath('userData'))
   await dataProtection.initialize()
+  authStore = new LocalAuthStore(dataProtection.paths.settings)
+  await authStore.initialize()
+  ipcMain.handle('auth:state', () => authStore?.state() ?? { configured: false, authenticated: false, profile: null })
+  ipcMain.handle('auth:login', (_event, input: unknown) => {
+    if (!authStore) throw new Error('Authentication is unavailable.')
+    return authStore.login(input)
+  })
+  ipcMain.handle('auth:logout', () => authStore?.logout() ?? { configured: false, authenticated: false, profile: null })
+  workspaceStore = new WorkspaceStore(dataProtection.paths.database)
+  await workspaceStore.initialize()
   coreConfig = new CoreConfigStore(join(app.getPath('userData'), 'core'))
   await coreConfig.initialize()
   ipcMain.handle('app:version', () => app.getVersion())
@@ -239,6 +377,11 @@ app.whenReady().then(async () => {
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
+}).catch((error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error)
+  console.error('WorkMuse failed to start:', error)
+  dialog.showErrorBox('WorkMuse 启动失败', `无法初始化本地工作区：${message}`)
+  app.quit()
 })
 
 app.on('before-quit', () => {

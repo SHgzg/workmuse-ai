@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "electron-vite dev",
     "typecheck": "tsc --noEmit",
+    "test:core": "node --experimental-strip-types --test src/core/assets/asset-store.test.mjs src/core/domain/workspace-store.test.mjs src/main/local-auth.test.mjs",
     "build": "pnpm typecheck && electron-vite build",
     "runtime:build": "python scripts/build_worker.py",
     "preview": "electron-vite preview",
