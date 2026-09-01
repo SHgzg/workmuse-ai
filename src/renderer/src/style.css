@@ -9,9 +9,22 @@ html, body, #root { width: 100%; height: 100%; margin: 0; overflow: hidden; }
 html { background: #f5f6fa; }
 body { min-width: 0; min-height: 0; background: #f5f6fa; font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
 button, input, select, textarea { font: inherit; }
-button { cursor: pointer; }
-.form-control { width: 100%; min-width: 0; border: 1px solid #e2e8f0; border-radius: .65rem; background: #fff; padding: .55rem .65rem; color: #334155; font-size: 9.5px; outline: none; transition: border-color .15s, box-shadow .15s; }
+button { cursor: pointer; white-space: nowrap; }
+.form-control { width: 100%; min-width: 0; border: 1px solid #e2e8f0; border-radius: .65rem; background: #fff; padding: .55rem .65rem; color: #334155; font-size: 13px; line-height: 1.5; outline: none; transition: border-color .15s, box-shadow .15s; }
 .form-control:focus { border-color: #c4b5fd; box-shadow: 0 0 0 3px #f5f3ff; }
+
+/* Keep dense desktop layouts readable without changing their responsive geometry. */
+.text-\[7\.5px\] { font-size: 10.5px; }
+.text-\[8px\] { font-size: 11px; }
+.text-\[8\.5px\] { font-size: 11.5px; }
+.text-\[9px\] { font-size: 12px; }
+.text-\[9\.5px\] { font-size: 12.5px; }
+.text-\[10px\] { font-size: 13px; }
+.text-\[10\.5px\] { font-size: 13.5px; }
+.text-\[11px\] { font-size: 14px; }
+.text-\[12px\] { font-size: 15px; }
+.text-\[13px\] { font-size: 16px; }
+.text-\[14px\] { font-size: 18px; }
 .app-shell { width: 100%; height: 100%; height: 100dvh; min-width: 0; min-height: 0; }
 .login-shell { width: 100%; height: 100%; height: 100dvh; grid-template-columns: minmax(420px, 1.08fr) minmax(400px, .92fr); }
 .login-grid { background-image: linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px); background-size: 42px 42px; mask-image: linear-gradient(to bottom, transparent, black 28%, black 72%, transparent); }
